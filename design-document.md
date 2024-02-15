@@ -3,16 +3,16 @@
 ### Requirements and Functionality:
 1. **Start Game:**
    - Listen for the channel point redemption "hot potato".
-   - Upon redemption, mention one of the top 100 active users in the chat to start the game.
+   - Upon redemption, mention one of the top 100 active users in the chat to start the game, give them the "hot potato".
 
 2. **Passing the Potato:**
    - Implement logic to track who currently holds the potato.
    - Users can only pass the potato if they currently hold it.
-   - Users must mention the user they want to pass the potato to along with one of the emotes designated for passing the potato, which will be stored in a configurable list (allowing the streamer to add/remove emotes as needed).
+   - Users must mention the user they want to pass the potato to, only the user holding the potato can pass it.
    - Introduce a configurable 5-second delay since the last pass has been done to prevent rapid passing of the potato.
 
 3. **Game End:**
-   - Define the conditions for ending the game, which occurs once the timer set at the start of the game is finished.
+   - the game ends once the timer set at the start of the game is finished.
    - Upon reaching the end of the game duration, identify the user holding the hot potato.
    - Apply a timeout for the user holding the hot potato at the end of the game, lasting for X amount of time. This timeout prevents the user from participating in chat interactions for the specified duration.
 
