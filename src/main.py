@@ -42,7 +42,7 @@ async def on_ready(ready_event: EventData):
 async def on_message(msg: ChatMessage):
     tracker.update_activity(msg.user.name, int(time.time()))
     if (msg.text.lower().startswith('@'+settings.BOT_NAME)):
-        await msg.reply(random.choice(settings.REPLY_MESSAGES))
+        await msg.chat.send_message(msg.room, random.choice(settings.REPLY_MESSAGES))
 
 # this will be called whenever the !kiss command is issued
 async def kiss(cmd: ChatCommand):
