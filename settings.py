@@ -1,4 +1,5 @@
 # Hot Potato game settings
+GAME_DURATION = 10 # Game duration in minutes
 ACTIVE_SIZE = 100 # Maximum amount of chatters in 1 hot potato game
 BAN_DURATION = 300 # Ban user, in minutes
 HOT_POTATO_EMOTES = ["WideHard"] # List of emotes the bot can use
