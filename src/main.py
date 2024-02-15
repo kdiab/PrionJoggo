@@ -39,23 +39,14 @@ async def on_ready(ready_event: EventData):
     print('Ready to throw potatoes')
     await ready_event.chat.join_room(TARGET_CHANNEL)
 
-async def reply(cmd: ChatCommand):
-    await cmd.send('nice')
-
 async def on_message(msg: ChatMessage):
     tracker.update_activity(msg.user.name, int(time.time()))
     if (msg.text.lower().startswith('@'+settings.BOT_NAME)):
-        reply() 
+        await msg.reply(random.choice(settings.REPLY_MESSAGES))
 
-# this will be called whenever the !reply command is issued
+# this will be called whenever the !kiss command is issued
 async def kiss(cmd: ChatCommand):
-    default_names = [
-    "Loose_Caboose", "SirMoses", "BossLofton", "Jonak", "LastSonido",
-    "Sonic_KP3", "Faberator", "Unanemus", "Ivan", "BEHEMETH",
-    "Georgepetervo", "SoloConway", "Xaddy", "Lusky", "Sainttits", "RyanIV",
-    "mynamemikew", "DD214pls", "K1lla__Noob", "FluffyPigs", "Angryturkey546",
-    "Dab_saget", "BioRome"
-]
+    default_names = ["Loose_Caboose", "xaddy_", "ubaru", "vori", "widejuicy", "djkumboi", "illicxt_bamb", "teaghandi"]
     kissed_user = random.choice(default_names)
     users = tracker.get_top_users()
     msg = random.choice(settings.KISS_MESSAGES)
@@ -83,7 +74,6 @@ async def bot():
     chat.register_event(ChatEvent.READY, on_ready)
     chat.register_event(ChatEvent.MESSAGE, on_message)
     chat.register_command('kiss', kiss)
-    chat.register_command('reply', reply)
     chat.start()
 
     # starting up PubSub
