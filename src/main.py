@@ -18,6 +18,7 @@ from uuid import UUID
 #import config 
 import dev as config
 import settings
+from controller import HotPotatoGame
 
 APP_ID = config.APP_ID
 APP_SECRET = config.APP_SECRET
@@ -29,6 +30,7 @@ TARGET_CHANNEL = config.TARGET_CHANNEL
 
 # Initialize the tracker
 tracker = ActiveUserTracker()
+hp = HotPotatoGame()
 
 async def callback_redemptions(uuid: UUID, data: dict) -> None:
     display_name = data['data']['redemption']['user']['display_name']
@@ -40,9 +42,14 @@ async def on_ready(ready_event: EventData):
     await ready_event.chat.join_room(TARGET_CHANNEL)
 
 async def on_message(msg: ChatMessage):
-    tracker.update_activity(msg.user.name, int(time.time()))
+    tracker.update_activity(msg.user.name.lower(), int(time.time()))
     if (msg.text.lower().startswith('@'+settings.BOT_NAME)):
         await msg.chat.send_message(msg.room, random.choice(settings.REPLY_MESSAGES))
+
+    if hp.is_game_active():
+        if msg.text.startswith('@'):
+            result = hp.pass_potato(msg.user.name.lower(), msg.text[1:].split(' ')[0].lower())
+            print(result)
 
 # this will be called whenever the !kiss command is issued
 async def kiss(cmd: ChatCommand):
@@ -54,6 +61,14 @@ async def kiss(cmd: ChatCommand):
         kissed_user = random.choice(users)
     msg = msg.replace('{x}', cmd.user.name).replace('{y}', kissed_user)
     await cmd.send(msg)
+
+async def start(cmd: ChatCommand):
+    default_names = ["Loose_Caboose", "xaddy_", "ubaru", "vori", "widejuicy", "djkumboi", "illicxt_bamb", "teaghandi"]
+    result = hp.start_game(default_names)
+    if result == 1:
+        print("Game started successfully")
+    else:
+        print("Failed to start game. A game might already be in progress.")
 
 async def bot():
     # setting up Authentication and getting your user id
@@ -74,6 +89,7 @@ async def bot():
     chat.register_event(ChatEvent.READY, on_ready)
     chat.register_event(ChatEvent.MESSAGE, on_message)
     chat.register_command('kiss', kiss)
+    chat.register_command('start', start)
     chat.start()
 
     # starting up PubSub
