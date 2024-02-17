@@ -13,12 +13,12 @@ if %ERRORLEVEL% neq 0 (
 :: Activate the virtual environment
 CALL venv\Scripts\activate.bat
 
+:: Navigate to src directory
+cd src
+
 :: Install dependencies from requirements.txt
 echo Installing dependencies...
 pip install -r requirements.txt
-
-:: Navigate to src directory
-cd src
 
 :: Start the bot
 echo Starting the bot...
