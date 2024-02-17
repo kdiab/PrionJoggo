@@ -15,8 +15,7 @@ from active_user_tracker import ActiveUserTracker
 import asyncio
 from pprint import pprint
 from uuid import UUID
-#import config 
-import dev as config
+import config 
 import settings
 from controller import HotPotatoGame
 
@@ -24,32 +23,57 @@ APP_ID = config.APP_ID
 APP_SECRET = config.APP_SECRET
 BOT_APP_ID = config.BOT_APP_ID
 BOT_APP_SECRET = config.BOT_APP_SECRET
-CHAT_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
+CHAT_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.MODERATOR_MANAGE_BANNED_USERS, AuthScope.MODERATOR_MANAGE_ANNOUNCEMENTS]
 USER_SCOPE = [AuthScope.CHANNEL_READ_REDEMPTIONS]
 TARGET_CHANNEL = config.TARGET_CHANNEL
 
 # Initialize the tracker
 tracker = ActiveUserTracker()
 hp = HotPotatoGame()
+streamer_id = None
+twitch_instance = None
 
 async def callback_redemptions(uuid: UUID, data: dict) -> None:
     display_name = data['data']['redemption']['user']['display_name']
     hot_potato = data['data']['redemption']['reward']['title']
     print(display_name, 'redeemed', hot_potato)
+   
+    if hot_potato == settings.REDEMPTION_NAME:
+        players = tracker.get_usernames()
+        result = await hp.start_game(players)
+        if result == 1:
+            potato_holder = hp.get_current_holder()
+            p = ', '.join(players)
+            await twitch_instance.send_chat_announcement(streamer_id, streamer_id, f"@{potato_holder} you have the potato 🥔! Pass it to anyone in this list {p}")
+            print("Game started")
+        else:
+            print("Error starting game, a game might already be in progress")
+ 
 
 async def on_ready(ready_event: EventData):
     print('Ready to throw potatoes')
     await ready_event.chat.join_room(TARGET_CHANNEL)
 
 async def on_message(msg: ChatMessage):
-    tracker.update_activity(msg.user.name.lower(), int(time.time()))
+    tracker.update_activity(msg.user.name.lower(),msg.user.id, int(time.time()))
     if (msg.text.lower().startswith('@'+settings.BOT_NAME)):
         await msg.chat.send_message(msg.room, random.choice(settings.REPLY_MESSAGES))
 
     if hp.is_game_active():
         if msg.text.startswith('@'):
-            result = hp.pass_potato(msg.user.name.lower(), msg.text[1:].split(' ')[0].lower())
-            print(result)
+            user = msg.user.name.lower()
+            target = msg.text[1:].split(' ')[0].lower()
+            result = hp.pass_potato(user, target)
+            if (result == 1):
+                emote = random.choice(settings.HOT_POTATO_EMOTES)
+                await msg.chat.send_message(msg.room, f"{emote} FBCatch 🥔⏳ {hp.time_left()}s... ⌛ @{user} -> @{target}")
+    
+    ban_user = hp.get_last_holder()
+    if ban_user != 0:
+        emote = random.choice(settings.HOT_POTATO_EMOTES)
+        await msg.chat.send_message(msg.room, f"{emote} 🥔💥💣 @{ban_user} 🥔💥💣 YER BANNED")
+        await twitch_instance.ban_user(streamer_id, streamer_id, tracker.get_user_id(ban_user), 'Lost at Hot Potato', settings.TIMEOUT_DURATION * 60)
+        print(f"Timed out {ban_user}")
 
 # this will be called whenever the !kiss command is issued
 async def kiss(cmd: ChatCommand):
@@ -61,16 +85,9 @@ async def kiss(cmd: ChatCommand):
         kissed_user = random.choice(users)
     msg = msg.replace('{x}', cmd.user.name).replace('{y}', kissed_user)
     await cmd.send(msg)
-
-async def start(cmd: ChatCommand):
-    default_names = ["Loose_Caboose", "xaddy_", "ubaru", "vori", "widejuicy", "djkumboi", "illicxt_bamb", "teaghandi"]
-    result = hp.start_game(default_names)
-    if result == 1:
-        print("Game started successfully")
-    else:
-        print("Failed to start game. A game might already be in progress.")
-
+   
 async def bot():
+    global streamer_id, chat_instance, twitch_instance
     # setting up Authentication and getting your user id
     twitch = await Twitch(BOT_APP_ID, BOT_APP_SECRET)
     auth = UserAuthenticator(twitch, CHAT_SCOPE, force_verify=False)
@@ -83,13 +100,15 @@ async def bot():
     await pub.set_user_authentication(pub_token, USER_SCOPE, pub_refresh_token)
 
     user = await first(pub.get_users(logins=[TARGET_CHANNEL]))
-    
+    streamer_id = user.id
+    twitch_instance = twitch
+
     # starting up chat
     chat = await Chat(twitch)
+    chat_instance = chat
     chat.register_event(ChatEvent.READY, on_ready)
     chat.register_event(ChatEvent.MESSAGE, on_message)
     chat.register_command('kiss', kiss)
-    chat.register_command('start', start)
     chat.start()
 
     # starting up PubSub
