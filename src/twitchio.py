@@ -20,6 +20,16 @@ class Bot(commands.Bot):
 
         await self.handle_commands(message)
 
+async def kiss(cmd: ChatCommand):
+    default_names = ["Loose_Caboose", "xaddy_", "ubaru", "vori", "widejuicy", "djkumboi", "illicxt_bamb", "teaghandi"]
+    kissed_user = random.choice(default_names)
+    users = tracker.get_top_users()
+    msg = random.choice(settings.KISS_MESSAGES)
+    if (len(users) > len(default_names)):
+        kissed_user = random.choice(users)
+    msg = msg.replace('{x}', cmd.user.name).replace('{y}', kissed_user)
+    await cmd.send(msg)
+
     @commands.command(name='timeout')
     async def timeout_user(self, ctx):
         if not ctx.author.is_mod:
