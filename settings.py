@@ -3,7 +3,7 @@ REDEMPTION_NAME= "Hot Potato" # This needs to match exactly
 GAME_DURATION = 10 # Game duration in minutes 
 ACTIVE_SIZE = 100 # Maximum amount of chatters in 1 hot potato game
 TIMEOUT_DURATION = 10 # Ban user, in minutes
-IGNORE_USERS = ["prisonjoe", "prionjoggo", "nightbot"] # List of users to ignore
+IGNORE_USERS = ["prisonjoe", "prionjoggo", "nightbot", "djkumbot"] # List of users to ignore
 BOT_NAME = "PrionJoggo"
 
 # List of emotes the bot can use

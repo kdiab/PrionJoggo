@@ -40,7 +40,7 @@ async def callback_redemptions(uuid: UUID, data: dict) -> None:
    
     if hot_potato == settings.REDEMPTION_NAME:
         players = tracker.get_usernames()
-        result = await hp.start_game(players)
+        result = await hp.start_game(players, display_name)
         if result == 1:
             potato_holder = hp.get_current_holder()
             p = ', '.join(players)
@@ -55,10 +55,6 @@ async def on_ready(ready_event: EventData):
     await ready_event.chat.join_room(TARGET_CHANNEL)
 
 async def on_message(msg: ChatMessage):
-    tracker.update_activity(msg.user.name.lower(),msg.user.id, int(time.time()))
-    if (msg.text.lower().startswith('@'+settings.BOT_NAME)):
-        await msg.chat.send_message(msg.room, random.choice(settings.REPLY_MESSAGES))
-
     if hp.is_game_active():
         if msg.text.startswith('@'):
             user = msg.user.name.lower()

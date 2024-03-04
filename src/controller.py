@@ -17,13 +17,13 @@ class HotPotatoGame:
         self.game_duration = settings.GAME_DURATION * 60
         self.last_holder = None
 
-    async def start_game(self, users):
+    async def start_game(self, users, redeemer):
         if not self.game_active:
             self.active_users = users
             if not self.active_users:
                 return 0
             self.game_active = True
-            self.potato_holder = random.choice(self.active_users)
+            self.potato_holder = redeemer 
             self.total_game_duration = self.game_duration + time.time()
             asyncio.create_task(self.run_game_duration())  # Start the game duration handling as a background task
             return 1
