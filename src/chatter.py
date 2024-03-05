@@ -29,22 +29,22 @@ class Bot(commands.Bot):
         # Listen to channel point redemptions
         @self.client.event()
         async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
-            print(f"Channel points redemption: {event}")
-#            display_name = event['data']['redemption']['user']['display_name']
-#            hot_potato = event['data']['redemption']['reward']['title']
-#            print(display_name, 'redeemed', hot_potato)
-#   
-#            if hot_potato == settings.REDEMPTION_NAME:
-#                players = getChatters()
-#                result = await hp.start_game(players, display_name)
-#            if result == 1:
-#                potato_holder = hp.get_current_holder()
-#                p = ', '.join(players)
-#                await twitch_instance.send_chat_announcement(streamer_id, streamer_id, f"@{potato_holder} you have the potato 🥔! Pass it to anyone in this list {p}")
-#                print("Game started")
-#            else:
-#                print("Error starting game, a game might already be in progress")
-#
+            print(event.reward.title)
+            #<CustomReward id=582ea7ab-dad0-4030-b839-a5b8a0e5c92b title=Positive Stimuli For Streamer cost=350>
+            display_name = event.user.name
+            hot_potato = event.reward.title
+   
+            if hot_potato == settings.REDEMPTION_NAME:
+                players = getChatters()
+                result = await hp.start_game(players, display_name)
+            if result == 1:
+                potato_holder = hp.get_current_holder()
+                p = ', '.join(players)
+                await twitch_instance.send_chat_announcement(streamer_id, streamer_id, f"@{potato_holder} you have the potato 🥔! Pass it to anyone in this list {p}")
+                print("Game started")
+            else:
+                print("Error starting game, a game might already be in progress")
+
     async def event_ready(self):
         print(f'Logged in as | {self.nick}')
         print(f'User id is | {self.user_id}')
