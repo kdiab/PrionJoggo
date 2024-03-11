@@ -16,6 +16,8 @@ class HotPotatoGame:
         self.game_active = False
         self.game_duration = settings.GAME_DURATION * 60
         self.last_holder = None
+        self.timeout_duration = settings.TIMEOUT_DURATION
+        self.recent_holders = []
 
     async def start_game(self, users, redeemer):
         if not self.game_active:
@@ -25,6 +27,8 @@ class HotPotatoGame:
             self.game_active = True
             self.potato_holder = redeemer 
             self.total_game_duration = self.game_duration + time.time()
+            self.timeout_duration = settings.TIMEOUT_DURATION
+            self.recent_holders = []
             asyncio.create_task(self.run_game_duration())  # Start the game duration handling as a background task
             return 1
         return 0
@@ -34,11 +38,21 @@ class HotPotatoGame:
         await self._internal_end_game()
         
     def pass_potato(self, current_user, target_user):
-        if self.game_active and current_user == self.potato_holder and target_user in self.active_users and current_user != target_user:
+        if self.game_active and current_user == self.potato_holder and target_user in self.active_users and current_user != target_user and target_user not in self.recent_holders:
             print(f'{current_user} -> {target_user}')
             self.potato_holder = target_user
-            return 1
-        return 0
+            self.recent_holders.append(current_user)
+            if len(self.recent_holders) > 3:
+                self.recent_holders.pop(0)
+            self.timeout_duration += 1
+            print(f'timeout duration increased to {self.timeout_duration} minutes')
+            return 1, self.timeout_duration
+        if self.game_active and current_user == target_user:
+            return 2, self.timeout_duration
+        if self.game_active and target_user in self.recent_holders:
+            return 3, self.timeout_duration
+
+        return 0, self.timeout_duration
 
     async def _internal_end_game(self):
         self.game_active = False
@@ -51,7 +65,7 @@ class HotPotatoGame:
         if not self.game_active and self.last_holder:
             ban_this_guy = self.last_holder
             self.last_holder = None
-            return ban_this_guy
+            return ban_this_guy, self.timeout_duration
         return 0
 
     def get_current_holder(self):
