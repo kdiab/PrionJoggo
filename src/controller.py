@@ -18,10 +18,12 @@ class HotPotatoGame:
         self.last_holder = None
         self.timeout_duration = settings.TIMEOUT_DURATION
         self.recent_holders = []
+        self.ignore_list = settings.IGNORE_USERS
 
     async def start_game(self, users, redeemer):
         if not self.game_active:
             self.active_users = users
+            print(users)
             if not self.active_users:
                 return 0
             self.game_active = True
@@ -38,7 +40,7 @@ class HotPotatoGame:
         await self._internal_end_game()
         
     def pass_potato(self, current_user, target_user):
-        if self.game_active and current_user == self.potato_holder and target_user in self.active_users and current_user != target_user and target_user not in self.recent_holders:
+        if self.game_active and current_user == self.potato_holder and target_user in self.active_users and current_user != target_user and target_user not in self.recent_holders and target_user not in self.ignore_list:
             print(f'{current_user} -> {target_user}')
             self.potato_holder = target_user
             self.recent_holders.append(current_user)
@@ -51,6 +53,9 @@ class HotPotatoGame:
             return 2, self.timeout_duration
         if self.game_active and target_user in self.recent_holders:
             return 3, self.timeout_duration
+        if self.game_active and target_user in self.ignore_list:
+            return 4, self.timeout_duration
+
 
         return 0, self.timeout_duration
 
