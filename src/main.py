@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from twitchio.ext import commands, pubsub
 import twitchio
 import random
-import dev as config 
+import config 
 import settings
 from controller import HotPotatoGame
 from aiohttp import ClientSession
