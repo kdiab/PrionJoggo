@@ -29,7 +29,7 @@ class Bot(commands.Bot):
         data = {
             'data': {
                 'user_id': str(user_id),
-                'duration': duration,  # Duration in seconds
+                'duration': duration * 60,  # Duration in seconds
                 'reason': 'Lost at HotPotato L BOZO SMOKED'
             }
         }
@@ -164,9 +164,6 @@ class Bot(commands.Bot):
                 elif result == 4:
                     await channel.send(f"@{user} you cannot pass the potato to that user, try someone else.")
                     #print(f"@{user} you cannot pass the potato to that user, try someone else.")
-    
-
-        if message.content.lower().startswith('2'):
 
         ban_user = hp.get_last_holder()
         if ban_user != 0:
