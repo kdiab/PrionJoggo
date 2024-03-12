@@ -10,8 +10,6 @@ import settings
 from controller import HotPotatoGame
 from aiohttp import ClientSession
 
-
-
 hp = HotPotatoGame()
 
 class Bot(commands.Bot):
@@ -99,7 +97,7 @@ class Bot(commands.Bot):
         async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
             display_name = event.user.name.lower()
             hot_potato = event.reward.title
-
+ 
             if hot_potato == settings.REDEMPTION_NAME:
                channel = self.get_channel(config.TARGET_CHANNEL)
                chatters = channel.chatters
@@ -109,8 +107,10 @@ class Bot(commands.Bot):
                    potato_holder = hp.get_current_holder()
                    channel = self.get_channel(config.TARGET_CHANNEL)
                    await channel.send(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in the chat!")
+                   #print(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in chat!")
                else:
                    await channel.send("Could not heat up the potato, a game might already be in progress or there is no one in the chat.")
+                   #print("Error starting game, a game might already be in progress")
 
     async def event_ready(self):
         print(f'Logged in as | {self.nick}')
@@ -131,20 +131,7 @@ class Bot(commands.Bot):
             channel = self.get_channel(config.TARGET_CHANNEL)
             #print((random.choice(settings.REPLY_MESSAGES)))
             await channel.send(random.choice(settings.REPLY_MESSAGES))
-
-        if message.content.lower().startswith('1'):
-            channel = self.get_channel(config.TARGET_CHANNEL)
-            chatters = channel.chatters
-            players = [user.name for user in chatters]
-            result = await hp.start_game(players, message.author.name.lower())
-            if result == 1:
-                potato_holder = hp.get_current_holder()
-                await channel.send(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in chat!")
-                #print(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in chat!")
-            else:
-                await channel.send("Error starting game, a game might already be in progress")
-                #print("Error starting game, a game might already be in progress")
-        
+       
         if hp.is_game_active():
             if message.content.startswith('@'):
                 user = message.author.name.lower()
@@ -181,8 +168,8 @@ class Bot(commands.Bot):
         kissed_user = random.choice(self.getChatters(ctx.users, ctx.author.name))
         msg = random.choice(settings.KISS_MESSAGES)
         msg = msg.replace('{x}', ctx.author.name).replace('{y}', kissed_user)
-        print(msg)
-        #await ctx.send(msg)
+        #print(msg)
+        await ctx.send(msg)
 
     def getChatters(self, users, author):
         sanitized_users = [user.name for user in users]
