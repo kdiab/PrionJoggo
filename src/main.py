@@ -2,128 +2,194 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-import time
+from twitchio.ext import commands, pubsub
+import twitchio
 import random
-from twitchAPI.pubsub import PubSub
-from twitchAPI.twitch import Twitch
-from twitchAPI.helper import first
-from twitchAPI.type import AuthScope, ChatEvent
-from twitchAPI.oauth import UserAuthenticator
-from twitchAPI.chat import Chat, EventData, ChatMessage, ChatSub, ChatCommand
-from active_user_tracker import ActiveUserTracker
-
-import asyncio
-from pprint import pprint
-from uuid import UUID
-import config 
+import dev as config 
 import settings
 from controller import HotPotatoGame
+from aiohttp import ClientSession
 
-APP_ID = config.APP_ID
-APP_SECRET = config.APP_SECRET
-BOT_APP_ID = config.BOT_APP_ID
-BOT_APP_SECRET = config.BOT_APP_SECRET
-CHAT_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.MODERATOR_MANAGE_BANNED_USERS, AuthScope.MODERATOR_MANAGE_ANNOUNCEMENTS]
-USER_SCOPE = [AuthScope.CHANNEL_READ_REDEMPTIONS]
-TARGET_CHANNEL = config.TARGET_CHANNEL
 
-# Initialize the tracker
-tracker = ActiveUserTracker()
+
 hp = HotPotatoGame()
-streamer_id = None
-twitch_instance = None
 
-async def callback_redemptions(uuid: UUID, data: dict) -> None:
-    display_name = data['data']['redemption']['user']['display_name']
-    hot_potato = data['data']['redemption']['reward']['title']
-    print(display_name, 'redeemed', hot_potato)
-   
-    if hot_potato == settings.REDEMPTION_NAME:
-        players = tracker.get_usernames()
-        result = await hp.start_game(players, display_name)
-        if result == 1:
-            potato_holder = hp.get_current_holder()
-            p = ', '.join(players)
-            await twitch_instance.send_chat_announcement(streamer_id, streamer_id, f"@{potato_holder} you have the potato 🥔! Pass it to anyone in this list {p}")
-            print("Game started")
-        else:
-            print("Error starting game, a game might already be in progress")
- 
-
-async def on_ready(ready_event: EventData):
-    print('Ready to throw potatoes')
-    await ready_event.chat.join_room(TARGET_CHANNEL)
-
-async def on_message(msg: ChatMessage):
-    if hp.is_game_active():
-        if msg.text.startswith('@'):
-            user = msg.user.name.lower()
-            target = msg.text[1:].split(' ')[0].lower()
-            result = hp.pass_potato(user, target)
-            if (result == 1):
-                emote = random.choice(settings.HOT_POTATO_EMOTES)
-                await msg.chat.send_message(msg.room, f"{emote} FBCatch 🥔⏳ {hp.time_left()}s... ⌛ @{user} -> @{target}")
+class Bot(commands.Bot):
     
-    ban_user = hp.get_last_holder()
-    if ban_user != 0:
-        emote = random.choice(settings.HOT_POTATO_EMOTES)
-        await msg.chat.send_message(msg.room, f"{emote} 🥔💥💣 @{ban_user} 🥔💥💣 YER BANNED")
-        await twitch_instance.ban_user(streamer_id, streamer_id, tracker.get_user_id(ban_user), 'Lost at Hot Potato', settings.TIMEOUT_DURATION * 60)
-        print(f"Timed out {ban_user}")
+    async def timeout_user(self, channel_name, user, duration):
+        user_id = await self.get_user_id(user)
+        # Ensure you're using the correct headers for authentication with the streamer's OAuth token
+        headers = {
+            'Client-ID': config.STREAMER_CLIENT_ID,
+            'Authorization': f'Bearer {config.STREAMER_OAUTH_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        # Construct the Twitch API endpoint for issuing a timeout
+        url = f"https://api.twitch.tv/helix/moderation/bans?broadcaster_id={config.STREAMER_CHANNEL_ID}&moderator_id={config.STREAMER_CHANNEL_ID}"
+        data = {
+            'data': {
+                'user_id': str(user_id),
+                'duration': duration * 60,  # Duration in seconds
+                'reason': 'Lost at HotPotato L BOZO SMOKED'
+            }
+        }
+        print(data)
+        async with self.session.post(url, headers=headers, json=data) as resp:
+            if resp.status == 204:
+                print(f"Successfully timed out {user} for {duration} seconds.")
+            else:
+                response = await resp.text()
+                print(f"Failed to timeout {user}. Response: {response}")
 
-# this will be called whenever the !kiss command is issued
-async def kiss(cmd: ChatCommand):
-    default_names = ["Loose_Caboose", "xaddy_", "ubaru", "vori", "widejuicy", "djkumboi", "illicxt_bamb", "teaghandi"]
-    kissed_user = random.choice(default_names)
-    users = tracker.get_top_users()
-    msg = random.choice(settings.KISS_MESSAGES)
-    if (len(users) > len(default_names)):
-        kissed_user = random.choice(users)
-    msg = msg.replace('{x}', cmd.user.name).replace('{y}', kissed_user)
-    await cmd.send(msg)
-   
-async def bot():
-    global streamer_id, chat_instance, twitch_instance
-    # setting up Authentication and getting your user id
-    twitch = await Twitch(BOT_APP_ID, BOT_APP_SECRET)
-    auth = UserAuthenticator(twitch, CHAT_SCOPE, force_verify=False)
-    token, refresh_token = await auth.authenticate()
-    await twitch.set_user_authentication(token, CHAT_SCOPE, refresh_token)
-
-    pub = await Twitch(APP_ID, APP_SECRET)
-    pub_auth = UserAuthenticator(pub, USER_SCOPE, force_verify=False)
-    pub_token, pub_refresh_token = await pub_auth.authenticate()
-    await pub.set_user_authentication(pub_token, USER_SCOPE, pub_refresh_token)
-
-    user = await first(pub.get_users(logins=[TARGET_CHANNEL]))
-    streamer_id = user.id
-    twitch_instance = twitch
-
-    # starting up chat
-    chat = await Chat(twitch)
-    chat_instance = chat
-    chat.register_event(ChatEvent.READY, on_ready)
-    chat.register_event(ChatEvent.MESSAGE, on_message)
-    chat.register_command('kiss', kiss)
-    chat.start()
-
-    # starting up PubSub
-    pubsub = PubSub(pub)
-    pubsub.start()
-
-    uuid = await pubsub.listen_channel_points(user.id, callback_redemptions)
+    async def get_user_id(self, username):
+        url = f"https://api.twitch.tv/helix/users?login={username}"
+        headers = {
+            'Client-ID': config.STREAMER_CLIENT_ID,
+            'Authorization': f'Bearer {config.STREAMER_OAUTH_TOKEN}'
+        }
+        async with self.session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                users = data.get('data', [])
+                if users:
+                    return users[0].get('id')  # Return the user ID of the first user found
+        return None
     
-    # user input to stop the bot
-    print('Enter S to stop bot')
-    bot_active = True
-    while bot_active:
-        user_input = input()
-        if user_input.lower() == 's':
-            bot_active = False
+    
 
-    await pubsub.unlisten(uuid)
-    pubsub.stop()
-    chat.stop()
-    await twitch.close()
+  #  async def send_message_as_streamer(self, channel_name: str, message: str):
+  #      url = "https://api.twitch.tv/helix/chat/messages"
+  #      headers = {
+  #          "Authorization": f"Bearer {config.STREAMER_OAUTH_TOKEN}",
+  #          "Client-Id": f"{config.STREAMER_CLIENT_ID}",
+  #          "Content-Type": "application/json"
+  #      }
+  #      payload = {
+  #          "message": message,
+  #          "broadcaster_id": config.STREAMER_CHANNEL_ID,
+  #          "sender_id": config.STREAMER_CHANNEL_ID
+  #      }
+  #      async with aiohttp.ClientSession() as session:
+  #          async with session.post(url, json=payload, headers=headers) as response:
+  #              response_json = await response.json()  # Parse JSON response
+  #              if response.status in [200, 204]:
+  #                  print("Message sent successfully as the streamer.")
+  #              elif "is_sent" in response_json.get("data", [{}])[0]:
+  #                  print(f"Message sent successfully as the streamer: {response_json['data'][0]['message_id']}")
+  #              else:
+  #                  print(f"Failed to send message as the streamer: {response.text}")
+    
+    def __init__(self):
+        super().__init__(token=config.BOT_OAUTH_TOKEN, prefix=['!'], initial_channels=[config.TARGET_CHANNEL])  # Bot's OAuth token
+        self.client = twitchio.Client(token=config.STREAMER_OAUTH_TOKEN)  # Streamer's OAuth token for PubSub
+        self.client.pubsub = pubsub.PubSubPool(self.client)
+        self.session = None 
 
-asyncio.run(bot())
+    async def setup_pubsub(self):
+        # Define the topics to subscribe to
+        topics = [
+                pubsub.channel_points(config.STREAMER_OAUTH_TOKEN)[int(config.STREAMER_CHANNEL_ID)],
+                ]
+
+        # Subscribe to the topics
+        await self.client.pubsub.subscribe_topics(topics)
+
+        # Listen to channel point redemptions
+        @self.client.event()
+        async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
+            display_name = event.user.name.lower()
+            hot_potato = event.reward.title
+
+            if hot_potato == settings.REDEMPTION_NAME:
+               channel = self.get_channel(config.TARGET_CHANNEL)
+               chatters = channel.chatters
+               players = [user.name for user in chatters]
+               result = await hp.start_game(players, display_name)
+               if result == 1:
+                   potato_holder = hp.get_current_holder()
+                   channel = self.get_channel(config.TARGET_CHANNEL)
+                   await channel.send(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in the chat!")
+               else:
+                   await channel.send("Could not heat up the potato, a game might already be in progress or there is no one in the chat.")
+
+    async def event_ready(self):
+        print(f'Logged in as | {self.nick}')
+        print(f'User id is | {self.user_id}')
+        self.session = ClientSession()
+
+        # Setup and start PubSub listening
+        await self.setup_pubsub()
+
+    async def event_disconnect(self):
+        if self.session:
+            await self.session.close()
+
+    async def event_message(self, message):
+        if message.echo:
+            return
+        if message.content.lower().startswith('@prisonjoe'):
+            channel = self.get_channel(config.TARGET_CHANNEL)
+            #print((random.choice(settings.REPLY_MESSAGES)))
+            await channel.send(random.choice(settings.REPLY_MESSAGES))
+
+        if message.content.lower().startswith('1'):
+            channel = self.get_channel(config.TARGET_CHANNEL)
+            chatters = channel.chatters
+            players = [user.name for user in chatters]
+            result = await hp.start_game(players, message.author.name.lower())
+            if result == 1:
+                potato_holder = hp.get_current_holder()
+                await channel.send(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in chat!")
+                #print(f"@{potato_holder} you have the potato 🥔! Pass it to anyone in chat!")
+            else:
+                await channel.send("Error starting game, a game might already be in progress")
+                #print("Error starting game, a game might already be in progress")
+        
+        if hp.is_game_active():
+            if message.content.startswith('@'):
+                user = message.author.name.lower()
+                target = message.content[1:].split(' ')[0].lower()
+                result, timeout = hp.pass_potato(user, target)
+                if (result == 1):
+                    emote = random.choice(settings.HOT_POTATO_EMOTES)
+                    channel = self.get_channel(config.TARGET_CHANNEL)
+                    await channel.send(f"{emote} FBCatch 🥔⏳ {hp.time_left()}s... ⌛ @{user} -> @{target} PauseChamp timeout: {timeout} minutes.")
+                    #print(f"{emote} FBCatch 🥔⏳ {hp.time_left()}s... ⌛ @{user} -> @{target} PauseChamp timeout: {timeout} minutes.")
+                elif result == 2:
+                    await channel.send(f"@{user} you cannot pass the potato to yourself!")
+                    #print(f"@{user} you cannot pass the potato to yourself!")
+                elif result == 3:
+                    await channel.send(f"@{user} your target has recently had the potato, try someone else!")
+                    #print(f"@{user} your target has recently had the potato, try someone else!")
+                elif result == 4:
+                    await channel.send(f"@{user} you cannot pass the potato to that user, try someone else.")
+                    #print(f"@{user} you cannot pass the potato to that user, try someone else.")
+
+        ban_user = hp.get_last_holder()
+        if ban_user != 0:
+            emote = random.choice(settings.HOT_POTATO_EMOTES)
+            channel = self.get_channel(config.TARGET_CHANNEL)
+            await channel.send(f"{emote} 🥔💥💣 @{ban_user[0]} 🥔💥💣 YER BANNED")
+            print(f"Timed out {ban_user[0]} for {ban_user[1]} minutes")
+            await self.timeout_user(config.TARGET_CHANNEL, ban_user[0], ban_user[1])
+
+        
+        await self.handle_commands(message)
+
+    @commands.command()
+    async def kiss(self, ctx: commands.Context):
+        kissed_user = random.choice(self.getChatters(ctx.users, ctx.author.name))
+        msg = random.choice(settings.KISS_MESSAGES)
+        msg = msg.replace('{x}', ctx.author.name).replace('{y}', kissed_user)
+        print(msg)
+        #await ctx.send(msg)
+
+    def getChatters(self, users, author):
+        sanitized_users = [user.name for user in users]
+        if author in sanitized_users:
+            sanitized_users.remove(author)
+        return sanitized_users
+
+bot = Bot()
+bot.run()
+
