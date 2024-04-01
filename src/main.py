@@ -164,12 +164,19 @@ class Bot(commands.Bot):
         await self.handle_commands(message)
 
     @commands.command()
-    async def kiss(self, ctx: commands.Context):
-        kissed_user = random.choice(self.getChatters(ctx.users, ctx.author.name))
+    async def kiss(self, ctx):
+        parts = ctx.message.content.split()
+
+        if len(parts) >= 2:
+            kissed_user = parts[1].lstrip('@')
+        else:
+            await ctx.send("Who are you sending a kiss to? 😘")
+            return
+        
         msg = random.choice(settings.KISS_MESSAGES)
         msg = msg.replace('{x}', ctx.author.name).replace('{y}', kissed_user)
-        #print(msg)
-        await ctx.send(msg)
+
+        await ctx.send(msg) 
 
     def getChatters(self, users, author):
         sanitized_users = [user.name for user in users]
